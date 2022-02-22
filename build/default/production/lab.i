@@ -1,6 +1,6 @@
-# 1 "Prelab.s"
+# 1 "lab.s"
 # 1 "<built-in>" 1
-# 1 "Prelab.s" 2
+# 1 "lab.s" 2
 ;-------------------------------------------------------------------------------
 ;Encabezado
 ;-------------------------------------------------------------------------------
@@ -2488,12 +2488,18 @@ stk_offset SET 0
 auto_size SET 0
 ENDM
 # 7 "C:\\Program Files\\Microchip\\xc8\\v2.35\\pic\\include\\xc.inc" 2 3
-# 43 "Prelab.s" 2
+# 43 "lab.s" 2
 
 ;-------------------------------------------------------------------------------
 ;Macros
 ;-------------------------------------------------------------------------------
 
+  restart_tmr0 macro
+    BANKSEL TMR0 ; banco 00
+    MOVLW 100 ; cargar valor inicial a W
+    MOVWF TMR0 ; cargar el valor inicial al TIMER0
+    BCF ((INTCON) and 07Fh), 2 ; limpiar la bandera de overflow del TIMER0
+    endm
 ;-------------------------------------------------------------------------------
 ;Variables
 ;-------------------------------------------------------------------------------
@@ -2502,6 +2508,11 @@ ENDM
 
     W_TEMP: DS 1 ; 1 byte reservado (W Temporal)
     STATUS_TEMP: DS 1 ; 1 byte reservado (STATUS Temporal)
+
+    value: DS 1 ; (Variable que contiene valor a mostrar en los displays de 7-seg)
+    flags: DS 1 ; (Variable que indica que display hay que encender en cada instante)
+    nibbles: DS 2 ; (Variable que divide los nibbles alto y bajo de valor)
+    display_val: DS 2 ; Representación de cada nibble en el display de 7-seg
 
 ;-------------------------------------------------------------------------------
 ;Vector Reset
@@ -2524,8 +2535,10 @@ push:
     MOVWF STATUS_TEMP
 isr:
 
-    btfsc ((INTCON) and 07Fh), 0
+    BTFSC ((INTCON) and 07Fh), 0
     call int_iocb
+    BTFSC ((INTCON) and 07Fh), 2
+    call int_tmr0
 
 pop: ;regresamos los valores de W y STATUS
     SWAPF STATUS_TEMP, W
@@ -2547,6 +2560,37 @@ int_iocb:
     BCF ((INTCON) and 07Fh), 0 ; SÍ: limpiamos la bandera de interrupción
     return
 
+int_tmr0:
+
+    call display_selection
+    restart_tmr0
+    return
+
+display_selection:
+
+    BCF PORTD, 0 ; Apagamos display de nibble alto
+    BCF PORTD, 1 ; Apagamos display de nibble bajo
+    BTFSS flags, 0 ; Verificamos bandera
+    goto display_0 ;
+    goto display_1
+
+    ;return
+
+display_0:
+    MOVF display_val, W ; Movemos display a W
+    MOVWF PORTC ; Movemos Valor de tabla a PORTC
+    BSF PORTD, 1 ; Encendemos display de nibble bajo
+    BSF flags, 0 ; Cambiamos bandera para cambiar el otro display en la siguiente interrupción
+
+    return
+
+display_1:
+    MOVF display_val+1, W ; Movemos display+1 a W
+    MOVWF PORTC ; Movemos Valor de tabla a PORTC
+    BSF PORTD, 0 ; Encendemos display de nibble alto
+    BCF flags, 0 ; Cambiamos bandera para cambiar el otro display en la siguiente interrupción
+
+    return
 ;-------------------------------------------------------------------------------
 ;Tabla para display de siete segmentos
 ;-------------------------------------------------------------------------------
@@ -2580,15 +2624,15 @@ table:
 ;main (configuración)
 ;-------------------------------------------------------------------------------
 main:
-
-
+    call config_clock ; configuramos el reloj
+    call config_tmr0 ; configuramos el TIMER0
     call config_ports ; configuramos puertos
-    call config_iocrb ; configuramos las interruptions on change
+    call config_IOCRB ; configuramos las interruptions on change
     call config_int_enable ; activamos las interrupciones
 
     banksel PORTA
            ;---------------------------------------------------
-       ;TEMPORIZACIÓN TIMER0: 100 ms = 4*4us*(256-60)*32
+       ;TEMPORIZACIÓN TIMER0: 100 ms = 4*4us*(256-100)*4
        ;---------------------------------------------------
 
 ;-------------------------------------------------------------------------------
@@ -2596,12 +2640,15 @@ main:
 ;-------------------------------------------------------------------------------
 
 loop:
-
+    MOVF PORTA, W ; Valor del PORTA a W
+    MOVWF value ; Movemos W a variable valor
+    call nibble_save ; Guardamos nibble alto y bajo de valor
+    call display ; Guardamos los valores a enviar en PORTC para mostrar valor en hex
     goto loop
 ;-------------------------------------------------------------------------------
 ;subrutinas
 ;-------------------------------------------------------------------------------
-config_iocrb:
+config_IOCRB:
     banksel TRISA
     BSF IOCB, 0
     BSF IOCB, 1 ; seteamos los bits 0 y 1 del puerto B como interrupt on change
@@ -2619,7 +2666,8 @@ config_ports:
 
     banksel TRISA ; banco 01
     CLRF TRISA ; PORTA como salida
-
+    CLRF TRISC ; PORTC como salida
+    CLRF TRISD ; PORTD como salida
 
     BSF ((TRISB) and 07Fh), 0
     BSF ((TRISB) and 07Fh), 1 ; pines 1 & 2 del puerto B como entradas
@@ -2628,10 +2676,10 @@ config_ports:
 
     banksel PORTA ; banco 00
     CLRF PORTA ; limpiamos PORTA
-
+    CLRF PORTC ; limpiamos PORTC
+    CLRF PORTD ; limpiamos PORTD
+    CLRF flags
     return
-
-
 
 config_int_enable:
     BSF ((INTCON) and 07Fh), 7 ; INTCON
@@ -2642,4 +2690,46 @@ config_int_enable:
     BCF ((INTCON) and 07Fh), 2
     return
 
+config_clock:
+    banksel OSCCON ;banco 01
+    BCF ((OSCCON) and 07Fh), 6
+    BSF ((OSCCON) and 07Fh), 5
+    BCF ((OSCCON) and 07Fh), 4 ; IRCF <2:0> -> 010 250 kHz
+
+    BSF ((OSCCON) and 07Fh), 0 ;reloj interno
+    return
+
+config_tmr0:
+    banksel TRISA ; banco 01
+    BCF ((OPTION_REG) and 07Fh), 5 ; TIMER0 como temporizador
+    BCF ((OPTION_REG) and 07Fh), 3 ; Prescaler a TIMER0
+    BCF ((OPTION_REG) and 07Fh), 2
+    BCF ((OPTION_REG) and 07Fh), 1
+    BSF ((OPTION_REG) and 07Fh), 0 ; PS<2:0> -> preescaler 001 1:4
+
+    restart_tmr0
+    return
+
+nibble_save:
+    MOVLW 0x0F
+    ANDWF value, W ; Se hace un AND de value con el valor en W para guardar solo el nibble bajo
+    MOVWF nibbles ; Guardar el nibble bajo en el primer registro de la variable nibbles
+
+    MOVLW 0xF0
+    ANDWF value, W ; Se hace un AND con el valor en W para guardazr solo el nibble alto
+    MOVWF nibbles+1 ; Enviar el valor al segundo registro de la variable nibbles
+    SWAPF nibbles+1, F ; Utilizar un SWAPF para mover los nibbles de su posición high a la posición low
+
+    return
+
+display:
+    MOVF nibbles, W ; Movemos nibble bajo a W
+    call table ; Buscamos valor a cargar en PORTC
+    MOVWF display_val ; Guardamos en el primer registro de la variable display_val
+
+    MOVF nibbles+1, W ; Movemos nibble alto a W
+    call table ; Buscamos valor a cargar en PORTC
+    MOVWF display_val+1 ; Guardamos en en el segundo registro de la variable display_val
+
+    return
 END
