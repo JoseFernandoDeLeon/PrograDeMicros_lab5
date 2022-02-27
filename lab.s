@@ -121,17 +121,17 @@ display_selection:
 
     BCF	    PORTD, 0		; Apagamos display de nibble alto
     BCF	    PORTD, 1		; Apagamos display de nibble bajo
-    BTFSS   flags, 0		; Verificamos bandera
+    BTFSC   flags, 0		; Verificamos bandera
     goto    display_0		;  
     goto    display_1
     
-    ;return
+    return
     
 display_0:			
     MOVF    display_val, W	; Movemos display a W
     MOVWF   PORTC		; Movemos Valor de tabla a PORTC
     BSF	PORTD, 1	; Encendemos display de nibble bajo
-    BSF	flags, 0	; Cambiamos bandera para cambiar el otro display en la siguiente interrupción
+    BCF	flags, 0	; Cambiamos bandera para cambiar el otro display en la siguiente interrupción
     
     return
 
@@ -139,7 +139,7 @@ display_1:
     MOVF    display_val+1, W	; Movemos display+1 a W
     MOVWF   PORTC		; Movemos Valor de tabla a PORTC
     BSF	PORTD, 0	; Encendemos display de nibble alto
-    BCF	flags, 0	; Cambiamos bandera para cambiar el otro display en la siguiente interrupción
+    BSF	flags, 0	; Cambiamos bandera para cambiar el otro display en la siguiente interrupción
     
     return
 ;-------------------------------------------------------------------------------

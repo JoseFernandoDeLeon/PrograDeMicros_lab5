@@ -57,17 +57,17 @@ OBJECTDIR=build/${CND_CONF}/${IMAGE_TYPE}
 DISTDIR=dist/${CND_CONF}/${IMAGE_TYPE}
 
 # Source Files Quoted if spaced
-SOURCEFILES_QUOTED_IF_SPACED=lab.s
+SOURCEFILES_QUOTED_IF_SPACED=Prelab.s lab.s postlab.s
 
 # Object Files Quoted if spaced
-OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/lab.o
-POSSIBLE_DEPFILES=${OBJECTDIR}/lab.o.d
+OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/Prelab.o ${OBJECTDIR}/lab.o ${OBJECTDIR}/postlab.o
+POSSIBLE_DEPFILES=${OBJECTDIR}/Prelab.o.d ${OBJECTDIR}/lab.o.d ${OBJECTDIR}/postlab.o.d
 
 # Object Files
-OBJECTFILES=${OBJECTDIR}/lab.o
+OBJECTFILES=${OBJECTDIR}/Prelab.o ${OBJECTDIR}/lab.o ${OBJECTDIR}/postlab.o
 
 # Source Files
-SOURCEFILES=lab.s
+SOURCEFILES=Prelab.s lab.s postlab.s
 
 
 
@@ -95,6 +95,14 @@ FINAL_IMAGE_NAME_MINUS_EXTENSION=${DISTDIR}/Lab5.X.${IMAGE_TYPE}
 # ------------------------------------------------------------------------------------
 # Rules for buildStep: pic-as-assembler
 ifeq ($(TYPE_IMAGE), DEBUG_RUN)
+${OBJECTDIR}/Prelab.o: Prelab.s  nbproject/Makefile-${CND_CONF}.mk 
+	@${MKDIR} "${OBJECTDIR}" 
+	@${RM} ${OBJECTDIR}/Prelab.o 
+	${MP_AS} -mcpu=PIC16F887 -c \
+	-o ${OBJECTDIR}/Prelab.o \
+	Prelab.s \
+	 -D__DEBUG=1  -msummary=+mem,-psect,-class,-hex,-file,-sha1,-sha256,-xml,-xmlfull -fmax-errors=20 -mwarn=0 -xassembler-with-cpp
+	
 ${OBJECTDIR}/lab.o: lab.s  nbproject/Makefile-${CND_CONF}.mk 
 	@${MKDIR} "${OBJECTDIR}" 
 	@${RM} ${OBJECTDIR}/lab.o 
@@ -103,13 +111,37 @@ ${OBJECTDIR}/lab.o: lab.s  nbproject/Makefile-${CND_CONF}.mk
 	lab.s \
 	 -D__DEBUG=1  -msummary=+mem,-psect,-class,-hex,-file,-sha1,-sha256,-xml,-xmlfull -fmax-errors=20 -mwarn=0 -xassembler-with-cpp
 	
+${OBJECTDIR}/postlab.o: postlab.s  nbproject/Makefile-${CND_CONF}.mk 
+	@${MKDIR} "${OBJECTDIR}" 
+	@${RM} ${OBJECTDIR}/postlab.o 
+	${MP_AS} -mcpu=PIC16F887 -c \
+	-o ${OBJECTDIR}/postlab.o \
+	postlab.s \
+	 -D__DEBUG=1  -msummary=+mem,-psect,-class,-hex,-file,-sha1,-sha256,-xml,-xmlfull -fmax-errors=20 -mwarn=0 -xassembler-with-cpp
+	
 else
+${OBJECTDIR}/Prelab.o: Prelab.s  nbproject/Makefile-${CND_CONF}.mk 
+	@${MKDIR} "${OBJECTDIR}" 
+	@${RM} ${OBJECTDIR}/Prelab.o 
+	${MP_AS} -mcpu=PIC16F887 -c \
+	-o ${OBJECTDIR}/Prelab.o \
+	Prelab.s \
+	 -msummary=+mem,-psect,-class,-hex,-file,-sha1,-sha256,-xml,-xmlfull -fmax-errors=20 -mwarn=0 -xassembler-with-cpp
+	
 ${OBJECTDIR}/lab.o: lab.s  nbproject/Makefile-${CND_CONF}.mk 
 	@${MKDIR} "${OBJECTDIR}" 
 	@${RM} ${OBJECTDIR}/lab.o 
 	${MP_AS} -mcpu=PIC16F887 -c \
 	-o ${OBJECTDIR}/lab.o \
 	lab.s \
+	 -msummary=+mem,-psect,-class,-hex,-file,-sha1,-sha256,-xml,-xmlfull -fmax-errors=20 -mwarn=0 -xassembler-with-cpp
+	
+${OBJECTDIR}/postlab.o: postlab.s  nbproject/Makefile-${CND_CONF}.mk 
+	@${MKDIR} "${OBJECTDIR}" 
+	@${RM} ${OBJECTDIR}/postlab.o 
+	${MP_AS} -mcpu=PIC16F887 -c \
+	-o ${OBJECTDIR}/postlab.o \
+	postlab.s \
 	 -msummary=+mem,-psect,-class,-hex,-file,-sha1,-sha256,-xml,-xmlfull -fmax-errors=20 -mwarn=0 -xassembler-with-cpp
 	
 endif

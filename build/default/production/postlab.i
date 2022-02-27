@@ -1,17 +1,17 @@
-# 1 "lab.s"
+# 1 "postlab.s"
 # 1 "<built-in>" 1
-# 1 "lab.s" 2
+# 1 "postlab.s" 2
 ;-------------------------------------------------------------------------------
 ;Encabezado
 ;-------------------------------------------------------------------------------
 
-; Archivo: Prelab_main.s
+; Archivo: postlab.s
 ; Dispositivo: PIC16F887
 ; Autor: José Fernando de León González
 ; Compilador: pic-as (v2.30), MPLABX v5.40
 ;
-; Programa: Contador binario de 4 bits utilizando push-buttons e interrupciones y contador binario de 4 bits utilizando el timer0 e interrupciones
-; Hardware: Leds y resistencias en el puerto A y puerto D, pushbuttons en el puerto B.
+; Programa: displays multiplexados
+; Hardware: Leds y resistencias en el puerto A, pushbuttons en el puerto B, y displays en puerto C.
 ;
 ; Creado: 7/02/22
 ; Última modificación: 7/02/22
@@ -2488,7 +2488,7 @@ stk_offset SET 0
 auto_size SET 0
 ENDM
 # 7 "C:\\Program Files\\Microchip\\xc8\\v2.35\\pic\\include\\xc.inc" 2 3
-# 43 "lab.s" 2
+# 43 "postlab.s" 2
 
 ;-------------------------------------------------------------------------------
 ;Macros
@@ -2512,8 +2512,11 @@ ENDM
     value: DS 1 ; (Variable que contiene valor a mostrar en los displays de 7-seg)
     flags: DS 1 ; (Variable que indica que display hay que encender en cada instante)
     nibbles: DS 2 ; (Variable que divide los nibbles alto y bajo de valor)
-    display_val: DS 2 ; Representación de cada nibble en el display de 7-seg
+    display_val: DS 3 ; Representación de cada nibble en el display de 7-seg
 
+    centenas: DS 1 ; (Variable para almacenar la cantidad de centenas en el contador)
+    decenas: DS 1 ; (Variable para almacenar la cantidad de decenas en el contador)
+    unidades: DS 1 ; (Variable para almacenar la cantidad de unidades en el contador)
 ;-------------------------------------------------------------------------------
 ;Vector Reset
 ;-------------------------------------------------------------------------------
@@ -2570,8 +2573,11 @@ display_selection:
 
     BCF PORTD, 0 ; Apagamos display de nibble alto
     BCF PORTD, 1 ; Apagamos display de nibble bajo
-    BTFSC flags, 0 ; Verificamos bandera
-    goto display_0 ;
+    BCF PORTD, 2
+    BTFSC flags, 1 ; Verificamos bandera
+    goto display_2
+    BTFSC flags, 0
+    goto display_0
     goto display_1
 
     return
@@ -2581,7 +2587,7 @@ display_0:
     MOVWF PORTC ; Movemos Valor de tabla a PORTC
     BSF PORTD, 1 ; Encendemos display de nibble bajo
     BCF flags, 0 ; Cambiamos bandera para cambiar el otro display en la siguiente interrupción
-
+    BSF flags, 1
     return
 
 display_1:
@@ -2589,6 +2595,14 @@ display_1:
     MOVWF PORTC ; Movemos Valor de tabla a PORTC
     BSF PORTD, 0 ; Encendemos display de nibble alto
     BSF flags, 0 ; Cambiamos bandera para cambiar el otro display en la siguiente interrupción
+    return
+
+display_2:
+    MOVF display_val+2, W ; Movemos display+1 a W
+    MOVWF PORTC ; Movemos Valor de tabla a PORTC
+    BSF PORTD, 2 ; Encendemos display de nibble alto
+    BCF flags, 0 ; Cambiamos bandera para cambiar el otro display en la siguiente interrupción
+    BCF flags, 1
 
     return
 ;-------------------------------------------------------------------------------
@@ -2642,8 +2656,17 @@ main:
 loop:
     MOVF PORTA, W ; Valor del PORTA a W
     MOVWF value ; Movemos W a variable valor
-    call nibble_save ; Guardamos nibble alto y bajo de valor
+
     call display ; Guardamos los valores a enviar en PORTC para mostrar valor en hex
+
+    CLRF unidades
+    CLRF decenas
+    CLRF centenas
+
+    call convertir_centenas
+    call convertir_decenas
+    call convertir_unidades
+
     goto loop
 ;-------------------------------------------------------------------------------
 ;subrutinas
@@ -2709,27 +2732,54 @@ config_tmr0:
 
     restart_tmr0
     return
-
-nibble_save:
-    MOVLW 0x0F
-    ANDWF value, W ; Se hace un AND de value con el valor en W para guardar solo el nibble bajo
-    MOVWF nibbles ; Guardar el nibble bajo en el primer registro de la variable nibbles
-
-    MOVLW 0xF0
-    ANDWF value, W ; Se hace un AND con el valor en W para guardazr solo el nibble alto
-    MOVWF nibbles+1 ; Enviar el valor al segundo registro de la variable nibbles
-    SWAPF nibbles+1, F ; Utilizar un SWAPF para mover los nibbles de su posición high a la posición low
-
-    return
-
+# 299 "postlab.s"
 display:
-    MOVF nibbles, W ; Movemos nibble bajo a W
+    MOVF decenas, W ; Movemos nibble bajo a W
     call table ; Buscamos valor a cargar en PORTC
     MOVWF display_val ; Guardamos en el primer registro de la variable display_val
 
-    MOVF nibbles+1, W ; Movemos nibble alto a W
+    MOVF centenas, W ; Movemos nibble alto a W
     call table ; Buscamos valor a cargar en PORTC
     MOVWF display_val+1 ; Guardamos en en el segundo registro de la variable display_val
 
+    MOVF unidades, W ; Movemos nibble alto a W
+    call table ; Buscamos valor a cargar en PORTC
+    MOVWF display_val+2 ; Guardamos en en el segundo registro de la variable display_val
+
     return
+
+convertir_centenas:
+    MOVLW 100 ; Enviamos 100 a W
+    SUBWF value, F ; Restamos 100 a w
+    INCF centenas ; incrementamos centenas
+    BTFSC STATUS, 0 ; verificamos si se activa el bit de borrow
+    goto $-4 ; NO: efectuamos nuevamente las restas
+    DECF centenas ; SÍ: solucionamos problemas de underflow y salimos de la subrutina
+    MOVLW 100
+    ADDWF value, F
+    return
+
+convertir_decenas:
+    MOVLW 10 ; Enviamos 10 a w
+    SUBWF value, F ; Restamos 10 a value
+    INCF decenas ; incrementamos decenas
+    BTFSC STATUS, 0 ; verificamos si se activa el bit de borrow
+    goto $-4 ; NO: efectuamos nuevamente las restas
+    DECF decenas ; SÍ: solucionamos problemas de underflow y salimos de la subrutina
+    MOVLW 10
+    ADDWF value, F
+    return
+
+convertir_unidades:
+
+    MOVLW 1 ; enviamos 1 a W
+    SUBWF value, F ; restamos 1 a value
+    INCF unidades ; incrementamos unidades
+    BTFSC STATUS, 0 ; verificamos si se activa el bit de borrow
+    goto $-4 ; NO: efectuamos nuevamente las restas
+    DECF unidades ; SÍ: solucionamos problemas de underflow y salimos de la subrutina
+    MOVLW 1
+    ADDWF value, F
+    return
+
 END
